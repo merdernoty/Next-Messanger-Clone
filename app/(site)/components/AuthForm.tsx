@@ -3,16 +3,30 @@
 import AuthSocialButton from "@/app/(site)/components/AuthSocialButton";
 import Button from "@/app/components/Button";
 import Input from "@/app/components/Inputs/Input";
+import axios from "axios";
+import { signIn, useSession } from "next-auth/react";
+
+import { useRouter } from "next/navigation";
+
 import React from "react";
 import { FieldValues, useForm, SubmitHandler } from "react-hook-form";
-import { BsGithub} from "react-icons/bs"
-import { BsGoogle } from "react-icons/bs"
+import { toast } from "react-hot-toast";
+import { BsGithub } from "react-icons/bs";
+import { BsGoogle } from "react-icons/bs";
 
 type Variant = "LOGIN" | "REGISTER";
 
 const AuthForm = () => {
+  const session = useSession();
+  const router = useRouter();
   const [variant, setVariant] = React.useState<Variant>("LOGIN");
   const [IsLoading, setIsLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    if(session?.status === "authenticated") { 
+      router.push("/users")
+    }
+  },[session?.status, router]);
 
   const toggleVariant = React.useCallback(() => {
     if (variant === "LOGIN") {
@@ -38,12 +52,43 @@ const AuthForm = () => {
     setIsLoading(true);
 
     if (variant === "REGISTER") {
-    }
+      axios
+        .post("/api/register", data)
+        .then(() => signIn("credentials", data))
+        .catch(() => toast.error("Something went wrong"))
+        .finally(() => setIsLoading(false))
+    };
     if (variant === "LOGIN") {
+      signIn("credentials", {
+        ...data,
+        redirect: false,
+      })
+        .then((callback) => {
+          if (callback?.error) {
+            toast.error("Invalid credentials");
+          }
+
+          if (callback?.ok && !callback?.error) {
+            toast.success("Successfully logged in!");
+            router.push("/users");
+          }
+        })
+        .finally(() => setIsLoading(false));
     }
   };
+
   const socialAction = (action: string) => {
     setIsLoading(true);
+
+    signIn(action, { redirect: false }).then((callback) => {
+      if (callback?.error) {
+        toast.error("Invalid credentials");
+      }
+      if (callback?.ok && !callback?.error) { 
+        toast.success("Successfully logged in!");
+      }
+    })
+    .finally(() => setIsLoading(false));
   };
 
   return (
@@ -67,7 +112,13 @@ const AuthForm = () => {
       >
         <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
           {variant === "REGISTER" && (
-            <Input id="name" label="Name" register={register} errors={errors} disabled={IsLoading} />
+            <Input
+              id="name"
+              label="Name"
+              register={register}
+              errors={errors}
+              disabled={IsLoading}
+            />
           )}
           <Input
             id="email"
@@ -109,11 +160,13 @@ const AuthForm = () => {
                border-gray-300"
               />
             </div>
-            <div className="
+            <div
+              className="
             relative
              flex 
              justify-center
-              text-sm">
+              text-sm"
+            >
               <span className="bg-white px-2 text-gray-500">
                 Or continue with
               </span>
@@ -121,24 +174,24 @@ const AuthForm = () => {
           </div>
           <div className="mt-6 flex gap-2">
             <AuthSocialButton
-            icon={BsGithub}
-            onClick={() => socialAction("github")}
+              icon={BsGithub}
+              onClick={() => socialAction("github")}
             />
             <AuthSocialButton
-            icon={BsGoogle}
-            onClick={() => socialAction("google")}
+              icon={BsGoogle}
+              onClick={() => socialAction("google")}
             />
           </div>
         </div>
         <div className="flex gap-2 justify-center text-sm mt-6 px-2 text-gray-500">
-            <div>
-                {variant === "LOGIN" ? "New to Messager?" : "Already have an account?"}
-            </div>
-            <div onClick={toggleVariant}
-                className="underline cursor-pointer"
-            >
-                {variant === "LOGIN" ? "Create a new account" : "Login"}
-            </div>
+          <div>
+            {variant === "LOGIN"
+              ? "New to Messager?"
+              : "Already have an account?"}
+          </div>
+          <div onClick={toggleVariant} className="underline cursor-pointer">
+            {variant === "LOGIN" ? "Create a new account" : "Login"}
+          </div>
         </div>
       </div>
     </div>
